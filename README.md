@@ -1,9 +1,5 @@
-Streamlining parent-child communication with TEA
+OutMsg: Streamlining parent-child communication with TEA
 ================================================
-
-
-
-#OutMsg 
 
 Using OutMsg means that the update function of a child component returns a value of type OutMsg. Instead of the 
 usual type:
@@ -18,14 +14,20 @@ Its return type is something like this.
 update : ChildMsg -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 ```
 
-The `OutMsg` value is captured in the parent's update function, and handled accordingly. The basic pattern
-can be extended to return multiple `OutMsg` (using `List`) or to return no `OutMsg` (using `Maybe`).
+`OutMsg` is a user-defined type (just like `Model` or `Msg`) with the specific purpose of notifying a parent 
+component. The `OutMsg` value can be captured in the parent's update function, and handled accordingly. The basic pattern
+can be extended to return multiple `OutMsg` using `List` or to optionally return no `OutMsg` using `Maybe`.
 
 **Technical writing is hard:** If anything is unclear, please open an issue, or create a PR.
 
-#Why this library 
+#Using this library
 
-As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. The child's update function is defined as follows:
+As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. 
+I'll show how this library and the OutMsg approach can be used to let a child notify its parent.
+
+###Changes to the child
+
+The child's update function is defined as follows:
 ```elm
 -- Gif.elm 
 
@@ -80,6 +82,8 @@ update msg model =
       (model, Cmd.none, SomethingWentWrong err)
 ```
 
+###Changes to the parent
+
 The `OutMsg` value can now be extracted by the parent
 
 ```elm
@@ -98,10 +102,11 @@ the following signature:
 interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
 ```
 
-Notice the similarity between
-
-* `update :             Msg -> Model -> (Model, Cmd Msg)`
-* `interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)`
+Notice the similarity between update and interetOutMsg.
+```elm
+update :             Msg -> Model -> (Model, Cmd Msg)
+interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
+```
 
 A dummy interpretOutMsg could be 
 
@@ -114,16 +119,15 @@ interpretOutMsg outmsg model =
         SomethingWentWrong err -> 
             Debug.log "A child component had an http error" (toString err) 
 ```
-*Obviously you'd want to have more robust error handling. This is just an example*
 
 
-##Wiring
+###Wiring
 
 The only thing that remains is wiring, but that seems to become a hairy affair very quickly. That is where this 
 library comes in.
 
 For brevity I will only work with the `Right` branch of the parent's update function. 
-
+This is what the wiring looks like:
 ```elm
 -- Parent.elm 
         Right rightMsg ->
@@ -214,10 +218,13 @@ update msg model =
                 )
 ```
 
-There are several downsides to this approach. 
-Firstly, the purpose of Msg is clearly defined within TEA. Giving a Msg extra meaning will confuse other elm users and may not play nicely with libraries. 
+The main problem is that this abuse of Msg does not play well with TEA. 
+The purpose of Msg is clearly defined within TEA. 
+Giving a Msg extra meaning will reliably confuse other elm users and may not play nicely with libraries. 
 In addition, there are cases when sending an a message to the parent should not have further effects. Creating a Msg constructor for
 this action will extend the child's update function with an extra pattern match that is effectively a NoOp. 
+
+
 
 #Thanks 
 
