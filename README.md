@@ -25,8 +25,7 @@ can be extended to return multiple `OutMsg` (using `List`) or to return no `OutM
 
 #Why this library 
 
-As a running example, let's look at [TEA]()s Gif.
-
+As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. The child's update function is defined as follows:
 ```elm
 -- Gif.elm 
 
@@ -49,53 +48,21 @@ update msg model =
       (model, Cmd.none)
 ```
 
-Now let's say that the child (an individual counter) wants to tell its parent that fetching an image has failed.  
-A possibility is for the parent to pattern match on the message that it will feed to the child's update function in the parent update
-function
-
+Let's say that the parent component needs to be notified of any http failures, so it can respond to them. Using the OutMsg approach
+the update function gets an extended type, and all cases need to return a value of this extended type.
 ```elm
--- Parent.elm
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        Left leftMsg ->
-            let
-                ( left, leftCmds ) =
-                    Gif.update leftMsg model.left
-                
-                reportFailure = 
-                    case leftMsg of 
-                        FetchFail err -> Just err
-                        _ -> Nothing
-            in
-                ( Model left model.right
-                , Cmd.map Left leftCmds
-                )
-
-        Right rightMsg ->
-            let
-                ( right, rightCmds ) =
-                    Gif.update rightMsg model.right
-
-                reportFailure = 
-                    case rightMsg of 
-                        FetchFail err -> Just err
-                        _ -> Nothing
-            in
-                ( Model model.left right
-                , Cmd.map Right rightCmds
-                )
+-- old 
+update : Msg -> Model -> (Model, Cmd Msg)
+(model, getRandomGif model.topic)
+-- new
+update : Msg -> Model -> (Model, Cmd Msg, Maybe OutMsg)
+(model, getRandomGif model.topic, Nothing)
 ```
 
-This has several downsides. Abusing `Msg` for child-parent communication takes you far off the TEA path. It will seem weird to other 
-Elm users. In addition, there are cases where what you want to send to the parent is not based on a message. That case would necessitate an 
-empty `Msg` on the child, just so that it can be intercepted and dealt with by the parent. 
-
-
-There is a better way: extending the type of `return` of the child component:
+The complete new update function:    
 
 ```elm
--- Counter.elm 
+-- Gif.elm 
 
 type OutMsg 
     = SomethingWentWrong Http.Error 
@@ -122,8 +89,11 @@ The `OutMsg` value can now be extracted by the parent
 ```
 
 It is likely that the `OutMsg` needs to be turned into 
-a side-effect, for which we need a function of the type
+a change to the model and/or the execution of a `Cmd`. 
+These actions are jointly called a side-effect
 
+To turn an OutMsg into a side-effect, we need a function with 
+the following signature:
 ```elm
 interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
 ```
@@ -202,9 +172,52 @@ effects. Most of these steps are boilerplate. Using this package, the above can 
                         |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
 ```
 
-At the end of this, you are left with normal `(Model, Cmd Msg)` pair. 
+At the end of this, you are left with normal `(Model, Cmd Msg)` tuple. 
 
+#<a name="why-not-use-msg">Why not use Msg</a>
 
+A naive way to achieve parent-child communication is to (ab)use the child's Msg type. In the parent's update function, 
+the child Msg type can be pattern matched on. When a Msg is of a certain value, the parent can take action. In the Gif example, that
+could look like this: 
+
+```elm
+-- Parent.elm
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Left leftMsg ->
+            let
+                ( left, leftCmds ) =
+                    Gif.update leftMsg model.left
+                
+                reportFailure = 
+                    case leftMsg of 
+                        FetchFail err -> Just err
+                        _ -> Nothing
+            in
+                ( Model left model.right
+                , Cmd.map Left leftCmds
+                )
+
+        Right rightMsg ->
+            let
+                ( right, rightCmds ) =
+                    Gif.update rightMsg model.right
+
+                reportFailure = 
+                    case rightMsg of 
+                        FetchFail err -> Just err
+                        _ -> Nothing
+            in
+                ( Model model.left right
+                , Cmd.map Right rightCmds
+                )
+```
+
+There are several downsides to this approach. 
+Firstly, the purpose of Msg is clearly defined within TEA. Giving a Msg extra meaning will confuse other elm users and may not play nicely with libraries. 
+In addition, there are cases when sending an a message to the parent should not have further effects. Creating a Msg constructor for
+this action will extend the child's update function with an extra pattern match that is effectively a NoOp. 
 
 #Thanks 
 
