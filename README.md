@@ -1,5 +1,15 @@
-OutMsg: Streamlining parent-child communication with TEA
-================================================
+Streamlining parent-child communication with OutMsg
+===================================================
+
+`OutMsg` is a user-defined type (just like `Model` or `Msg`) with the specific purpose of notifying a parent 
+component. The `OutMsg` value can be captured in the parent's update function, and handled there. 
+
+The basic pattern
+can be extended to return multiple `OutMsg` using `List` or to optionally return no `OutMsg` using `Maybe`.
+
+**Technical writing is hard:** If anything is unclear, please open an issue, or create a PR.
+
+##The core idea
 
 Using OutMsg means that the update function of a child component returns a value of type OutMsg. Instead of the 
 usual type:
@@ -14,13 +24,24 @@ Its return type is something like this.
 update : ChildMsg -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 ```
 
-`OutMsg` is a user-defined type (just like `Model` or `Msg`) with the specific purpose of notifying a parent 
-component. The `OutMsg` value can be captured in the parent's update function, and handled accordingly. The basic pattern
-can be extended to return multiple `OutMsg` using `List` or to optionally return no `OutMsg` using `Maybe`.
+In the parent's update function, this library takes care of turning the OutMsg into model changes and commands. 
 
-**Technical writing is hard:** If anything is unclear, please open an issue, or create a PR.
+```elm
+        Right rightMsg ->
+            let
+                -- add the updated child component to the model
+                updateModel model rightChild = 
+                    Model model.left rightChild
+            in 
+                -- call update of the child component
+                    Gif.update rightMsg model.right
+                        -- map the child's commands
+                        |> mapCommand Right 
+                        -- OutMessage takes care of the rest
+                        |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
+```
 
-#Using this library
+#An example
 
 As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. 
 I'll show how this library and the OutMsg approach can be used to let a child notify its parent.
