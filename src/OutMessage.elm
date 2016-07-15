@@ -5,7 +5,7 @@ module OutMessage
         , evaluateResult
         , evaluateList
         , mapComponent
-        , mapChildCmd
+        , mapCmd
         , mapOutMsg
         , toNested
         , fromNested
@@ -16,26 +16,36 @@ module OutMessage
 {-|
 
 **Note: **  This library is opinionated. The usage of an OutMsg is a technique to extend The Elm Architecture (TEA) to support
-child-parent communication. The [README]() covers the design.
+child-parent communication. The [README](https://github.com/folkertdev/outmessage/blob/master/README.md) covers the design.
+
+The OutMsg pattern has two components:
+
+* OutMsg, a user-defined type (just like Model or Msg) with the specific purpose of notifying a parent component.
+* `interpretOutMsg`, a function that converts OutMsg values into side-effects (commands and changes to the model)
+
+OutMsg values can be captured in the parent's update function, and handled there by `interpretOutMsg`.
+The basic pattern can be extended to return multiple OutMsg using List or to optionally return no OutMsg using Maybe.
 
 #Evaluators
 @docs evaluate, evaluateMaybe, evaluateList, evaluateResult
 
 #Mapping
-@docs mapComponent, mapChildCmd, mapOutMsg
+@docs mapComponent, mapCmd, mapOutMsg
 
 #Helpers
 @docs toNested, fromNested
 
 #Extend
+
+Internal functions that can be used to create custom evaluators.
+
+This package uses the [State](http://package.elm-lang.org/packages/folkertdev/elm-state/1.0.0/) package for threading the model through a series of
+updates and accumulating commands.
+
 @docs wrap, run
-
-Some internal functions that can be used to write your own custom `OutMsg` handler.
-
 -}
 
 import State exposing (state, State, andThen)
-import Debug
 
 
 swap ( x, y ) =
@@ -47,90 +57,65 @@ applyWithDefault default f =
     Maybe.withDefault default << Maybe.map f
 
 
-{-| Embed a function into [State](http://package.elm-lang.org/packages/folkertdev/elm-state/1.0.0/)
-
--}
-wrap : (outmsg -> model -> ( model, Cmd msg )) -> outmsg -> State model (Cmd msg)
-wrap f msg =
-    State.advance (f msg >> swap)
-
-
-{-| Evaluate a `State model (Cmd msg)` given a model and effects to prepend.
-
-This is the workhorse.
-
-    wrap (interpretOutMsg) myOutMsg
-        |> run Cmd.none myModel
--}
-run : Cmd msg -> model -> State model (Cmd msg) -> ( model, Cmd msg )
-run cmd model =
-    State.map (\outCmd -> Cmd.batch [ cmd, outCmd ])
-        >> State.run model
-        >> swap
-
-
 {-| Turn an `OutMsg` value into commands and model changes.
 
 The arguments are:
-* An update function, that given the updated child component,
-    produces a new model
-* `interpretOutMsg`, a function that turns OutMsg values into
-    model changes and effects. There are helpers for when the `outmsg` is
-    wrapped.
-* The return value of a child component update function
+* `interpretOutMsg`, a user-defined function that turns OutMsg values into
+    model changes and effects.
+* a tuple containing the model (updated with the child component),
+commands (of the parent's Msg type) and an OutMsg. This package exposes
+helpers to construct this tuple from the value that a child update function returns.
+
 
 Example usage:
-    -- in update : Msg -> Model -> (Model, Cmd Msg)
-    ChildComponentMessageWrapper childMsg ->
-        let
-            updateModel : Model -> ChildComponent -> Model
-            updateModel oldModel newChildComponent =
-                { oldModel | child = newChildComponent }
-        in
-
-            ChildComponentModule.update childMsg model.child
-                |> mapChildCmd ChildComponentMessageWrapper
-                |> evaluate (updateModel model) interpretOutMessage
-
+```elm
+-- in update : Msg -> Model -> (Model, Cmd Msg)
+-- assuming interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
+ChildComponentMessageWrapper childMsg ->
+    ChildComponentModule.update childMsg model.child
+        -- update the model with the new child component
+        |> OutMessage.mapComponent
+            (\newChild -> { model | child = newChild }
+        -- convert child cmd to parent cmd
+        |> OutMessage.mapCmd ChildComponentMessageWrapper
+        -- apply outmsg changes
+        |> OutMessage.evaluate interpretOutMsg
+```
 -}
 evaluate :
-    (childComponent -> model)
-    -> (outMsg -> model -> ( model, Cmd msg ))
-    -> ( childComponent, Cmd msg, outMsg )
+    (outMsg -> model -> ( model, Cmd msg ))
+    -> ( model, Cmd msg, outMsg )
     -> ( model, Cmd msg )
-evaluate updateModel interpretOutMsg ( childComponent, cmd, outMsg ) =
+evaluate interpretOutMsg ( model, cmd, outMsg ) =
     wrap interpretOutMsg outMsg
-        |> run cmd (updateModel childComponent)
+        |> run cmd model
 
 
-{-| Turn a `Maybe OutMsg` into effects.
+{-| Turn a `Maybe OutMsg` into effects and model changes.
 
-In the case of `Just outMsg`, the `OutMsg` will be fed to `interpretOutMsg`, in the case of
-Nothing, the default `Cmd Msg` is used. The updated child component is always added to the model.
+Has a third argument for a default command that is used when OutMsg is Nothing.
 -}
 evaluateMaybe :
-    (childComponent -> model)
-    -> (outMsg -> model -> ( model, Cmd msg ))
+    (outMsg -> model -> ( model, Cmd msg ))
     -> Cmd msg
-    -> ( childComponent, Cmd msg, Maybe outMsg )
+    -> ( model, Cmd msg, Maybe outMsg )
     -> ( model, Cmd msg )
-evaluateMaybe updateModel interpretOutMsg default ( childComponent, cmd, outMsg ) =
+evaluateMaybe interpretOutMsg default ( model, cmd, outMsg ) =
     applyWithDefault (state default) (wrap interpretOutMsg) outMsg
-        |> run cmd (updateModel childComponent)
+        |> run cmd model
 
 
-{-| Turn a `Result error OutMsg` into effects.
+{-| Turn a `Result error OutMsg` into effects and model changes
 
-In the case of `Ok outMsg`, the `OutMsg` will be fed to `interpretOutMsg`, in the case of
-`Err error`, the error will be fed to the given `onErr` function. The updated child component is always added to the model.
+Has a third argument for a function that turns errors into a command that is used when
+OutMsg is Err error.
 -}
 evaluateResult :
-    (childComponent -> model)
-    -> (outMsg -> model -> ( model, Cmd msg ))
+    (outMsg -> model -> ( model, Cmd msg ))
     -> (error -> Cmd msg)
-    -> ( childComponent, Cmd msg, Result error outMsg )
+    -> ( model, Cmd msg, Result error outMsg )
     -> ( model, Cmd msg )
-evaluateResult updateModel interpretOutMsg onErr ( childComponent, cmd, outMsg ) =
+evaluateResult interpretOutMsg onErr ( model, cmd, outMsg ) =
     let
         stateful =
             case outMsg of
@@ -141,31 +126,30 @@ evaluateResult updateModel interpretOutMsg onErr ( childComponent, cmd, outMsg )
                     state (onErr err)
     in
         stateful
-            |> run cmd (updateModel childComponent)
+            |> run cmd model
 
 
-{-| Turn a `List OutMsg` into effects.
+{-| Turn a `List OutMsg` into effects and model changes.
 
-This function takes care of threading the state through. This means that the
-Model that is returned by handling an OutMsg will be the input Model of
-`interpretOutMsg` when the next `OutMsg` is turned into effects.
+Takes care of threading the state. When interpreting an OutMsg changes the model,
+the updated model will be used for subsequent interpretations of OutMsgs. Cmds are
+accumulated and batched.
 -}
 evaluateList :
-    (childComponent -> model)
-    -> (outMsg -> model -> ( model, Cmd msg ))
-    -> ( childComponent, Cmd msg, List outMsg )
+    (outMsg -> model -> ( model, Cmd msg ))
+    -> ( model, Cmd msg, List outMsg )
     -> ( model, Cmd msg )
-evaluateList updateModel interpretOutMsg ( childComponent, cmd, outMsgs ) =
+evaluateList interpretOutMsg ( model, cmd, outMsgs ) =
     State.traverse (wrap interpretOutMsg) outMsgs
         |> State.map Cmd.batch
-        |> run cmd (updateModel childComponent)
+        |> run cmd model
 
 
 {-| Apply a function over the Msg from the child.
 -}
-mapChildCmd : (childmsg -> parentmsg) -> ( a, Cmd childmsg, c ) -> ( a, Cmd parentmsg, c )
-mapChildCmd f ( x, childCmd, z ) =
-    ( x, Cmd.map f childCmd, z )
+mapCmd : (childmsg -> parentmsg) -> ( a, Cmd childmsg, c ) -> ( a, Cmd parentmsg, c )
+mapCmd f ( x, cmd, z ) =
+    ( x, Cmd.map f cmd, z )
 
 
 {-| Apply a function over the updated child component.
@@ -200,3 +184,31 @@ toNested ( x, y, z ) =
 fromNested : ( ( a, b ), c ) -> ( a, b, c )
 fromNested ( ( x, y ), z ) =
     ( x, y, z )
+
+
+
+-- Internals
+
+
+{-| Embed a function into [State](http://package.elm-lang.org/packages/folkertdev/elm-state/1.0.0/)
+
+-}
+wrap : (outmsg -> model -> ( model, Cmd msg )) -> outmsg -> State model (Cmd msg)
+wrap f msg =
+    State.advance (swap << f msg)
+
+
+{-| Evaluate a `State model (Cmd msg)` given a model, and commands to prepend.
+
+Typically, `wrap` is used to make a function that creates a `State`. This function is then applied to
+(an optionally modified) outMsg. Run converts the State back to a (model, Cmd msg) tuple.
+
+    wrap (interpretOutMsg) myOutMsg
+        |> run Cmd.none myModel
+-}
+run : Cmd msg -> model -> State model (Cmd msg) -> ( model, Cmd msg )
+run cmd model =
+    -- Prepend the child component's Cmds
+    State.map (\outCmd -> Cmd.batch [ cmd, outCmd ])
+        >> State.run model
+        >> swap
