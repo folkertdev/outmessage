@@ -27,18 +27,16 @@ update : ChildMsg -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 In the parent's update function, this library takes care of turning the OutMsg into model changes and commands. 
 
 ```elm
-        Right rightMsg ->
-            let
-                -- add the updated child component to the model
-                updateModel model rightChild = 
-                    Model model.left rightChild
-            in 
-                -- call update of the child component
-                    Gif.update rightMsg model.right
-                        -- map the child's commands
-                        |> mapCommand Right 
-                        -- OutMessage takes care of the rest
-                        |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
+    Right rightMsg ->
+    -- call update of the child component
+        Gif.update rightMsg model.right
+            -- add the updated child component to the model
+            |> OutMessage.mapComponent
+                    (\newChild -> Model model.left newChild)
+            -- map the child's commands
+            |> OutMessage.mapCmd Right 
+            -- OutMessage takes care of the rest
+            |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
 ```
 
 #An example
@@ -183,18 +181,16 @@ Not very pretty. This kind of code is extremely error-prone, because you have to
 effects. Most of these steps are boilerplate. Using this package, the above can be written much more succinctly as 
 
 ```elm
-        Right rightMsg ->
-            let
-                -- add the updated child component to the model
-                updateModel model rightChild = 
-                    Model model.left rightChild
-            in 
-                -- call update of the child component
-                    Gif.update rightMsg model.right
-                        -- map the child's commands
-                        |> mapCommand Right 
-                        -- OutMessage takes care of the rest
-                        |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
+    Right rightMsg ->
+    -- call update of the child component
+        Gif.update rightMsg model.right
+            -- add the updated child component to the model
+            |> OutMessage.mapComponent
+                    (\newChild -> Model model.left newChild)
+            -- map the child's commands
+            |> OutMessage.mapCmd Right 
+            -- OutMessage takes care of the rest
+            |> OutMessage.evaluateMaybe (updateModel model) interpretOutMsg
 ```
 
 At the end of this, you are left with normal `(Model, Cmd Msg)` tuple. 
