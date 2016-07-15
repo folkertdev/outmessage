@@ -29,16 +29,17 @@ update : ChildMsg -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 In the parent's update function, this library takes care of turning the OutMsg into commands and model changes.
 
 ```elm
-    Right rightMsg ->
-    -- call update of the child component
-        Gif.update rightMsg model.right
-            -- add the updated child component to the model
-            |> OutMessage.mapComponent
-                    (\newChild -> Model model.left newChild)
-            -- map the child's commands
-            |> OutMessage.mapCmd Right 
-            -- OutMessage takes care of the rest
-            |> OutMessage.evaluateMaybe Cmd.none interpretOutMsg
+-- in update : Msg -> Model -> (Model, Cmd Msg)
+-- assuming interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
+ChildComponentMessageWrapper childMsg ->
+    ChildComponentModule.update childMsg model.child
+        -- update the model with the new child component
+        |> OutMessage.mapComponent
+            (\newChild -> { model | child = newChild }
+        -- convert child cmd to parent cmd
+        |> OutMessage.mapCmd ChildComponentMessageWrapper
+        -- apply outmsg changes
+        |> OutMessage.evaluate interpretOutMsg
 ```
 
 #An example
@@ -126,7 +127,7 @@ To turn the OutMsg into commands and model changes (side-effects), we need a fun
 interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
 ```
 
-Notice the similarity between update and interetOutMsg.
+Notice the similarity between update and interpretOutMsg.
 ```elm
 update :             Msg -> Model -> (Model, Cmd Msg)
 interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
@@ -182,8 +183,7 @@ This is what the wiring looks like:
                 )
 ```
 
-Not very pretty. This kind of code is extremely error-prone, because you have to manually update the state (your model) and accumulate the 
-effects. Most of these steps are boilerplate. Using this package, the above can be written much more succinctly as 
+Not very pretty. This kind of code is extremely error-prone, because the updating the state and accumulating commands is done manually. Most of these steps are boilerplate. Using this package, the above can be written much more succinctly as 
 
 ```elm
     Right rightMsg ->
