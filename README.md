@@ -1,11 +1,13 @@
 Streamlining parent-child communication with OutMsg
 ===================================================
 
-`OutMsg` is a user-defined type (just like `Model` or `Msg`) with the specific purpose of notifying a parent 
-component. The `OutMsg` value can be captured in the parent's update function, and handled there. 
+The OutMsg pattern is a technique for child-parent communication with The Elm Architecture (TEA). It has two components: 
 
-The basic pattern
-can be extended to return multiple `OutMsg` using `List` or to optionally return no `OutMsg` using `Maybe`.
+* `OutMsg`, a user-defined type (just like Msg) with the specific purpose of notifying a parent component.
+* `interpretOutMsg`, a function that converts OutMsg values into side-effects (commands and changes to the model)
+
+OutMsg values can be captured in the parent's update function, and handled there by `interpretOutMsg`.
+The pattern can be extended to work with multiple `OutMsg` using `List` or to optionally return no `OutMsg` using `Maybe`.
 
 **Technical writing is hard:** If anything is unclear, please open an issue, or create a PR.
 
@@ -24,7 +26,7 @@ Its return type is something like this.
 update : ChildMsg -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 ```
 
-In the parent's update function, this library takes care of turning the OutMsg into model changes and commands. 
+In the parent's update function, this library takes care of turning the OutMsg into commands and model changes.
 
 ```elm
     Right rightMsg ->
@@ -42,7 +44,14 @@ In the parent's update function, this library takes care of turning the OutMsg i
 #An example
 
 As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. 
-I'll show how this library and the OutMsg approach can be used to let a child notify its parent.
+Let's say that the parent component needs to be notified of any http failures, so it can respond to them. 
+
+Following the pattern, we need to: 
+
+* Change the child's update function to return an OutMsg
+* Write a `interpretOutMsg` function 
+* Wire everything up in the parent's update function
+
 
 ###Changes to the child
 
@@ -69,8 +78,8 @@ update msg model =
       (model, Cmd.none)
 ```
 
-Let's say that the parent component needs to be notified of any http failures, so it can respond to them. Using the OutMsg approach
-the update function gets an extended type, and all cases need to return a value of this extended type.
+We change the return type to include a `Maybe OutMsg`, which means that the following 
+needs to change:
 ```elm
 -- old 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -80,7 +89,7 @@ update : Msg -> Model -> (Model, Cmd Msg, Maybe OutMsg)
 (model, getRandomGif model.topic, Nothing)
 ```
 
-The complete new update function:    
+The complete new update function becomes: 
 
 ```elm
 -- Gif.elm 
@@ -111,12 +120,8 @@ The `OutMsg` value can now be extracted by the parent
         Gif.update leftMsg model.left
 ```
 
-It is likely that the `OutMsg` needs to be turned into 
-a change to the model and/or the execution of a `Cmd`. 
-These actions are jointly called a side-effect
+To turn the OutMsg into commands and model changes (side-effects), we need a function:
 
-To turn an OutMsg into a side-effect, we need a function with 
-the following signature:
 ```elm
 interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
 ```
