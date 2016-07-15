@@ -36,7 +36,7 @@ In the parent's update function, this library takes care of turning the OutMsg i
             -- map the child's commands
             |> OutMessage.mapCmd Right 
             -- OutMessage takes care of the rest
-            |> OutMessage.evaluateMaybe interpretOutMsg
+            |> OutMessage.evaluateMaybe Cmd.none interpretOutMsg
 ```
 
 #An example
@@ -190,7 +190,7 @@ effects. Most of these steps are boilerplate. Using this package, the above can 
             -- map the child's commands
             |> OutMessage.mapCmd Right 
             -- OutMessage takes care of the rest
-            |> OutMessage.evaluateMaybe interpretOutMsg
+            |> OutMessage.evaluateMaybe Cmd.none interpretOutMsg
 ```
 
 At the end of this, you are left with normal `(Model, Cmd Msg)` tuple. 
