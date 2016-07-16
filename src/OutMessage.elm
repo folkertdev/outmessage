@@ -35,9 +35,15 @@ The basic pattern can be extended to return multiple OutMsg using List or to opt
 #Helpers
 @docs toNested, fromNested
 
-#Extend
+#Internals
 
 Internal functions that can be used to create custom evaluators.
+
+An evaluator has three basic components:
+
+* **A state creator**, often using `OutMessage.wrap`.
+* **A state modifier**, any function from the State package (see the use of State.traverse in evaluateList).
+* **A state evaluator** that runs the state and creates a 'vanilla' elm value.
 
 This package uses the [State](http://package.elm-lang.org/packages/folkertdev/elm-state/1.0.0/) package for threading the model through a series of
 updates and accumulating commands.
@@ -48,6 +54,7 @@ updates and accumulating commands.
 import State exposing (state, State, andThen)
 
 
+swap : ( a, b ) -> ( b, a )
 swap ( x, y ) =
     ( y, x )
 
@@ -71,6 +78,9 @@ Example usage:
 ```elm
 -- in update : Msg -> Model -> (Model, Cmd Msg)
 -- assuming interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg)
+-- ChildComponentModule.update
+--       : ChildMsg
+--       -> ChildModel -> (ChildModel, Cmd ChildMsg, OutMsg)
 ChildComponentMessageWrapper childMsg ->
     ChildComponentModule.update childMsg model.child
         -- update the model with the new child component
@@ -199,9 +209,6 @@ wrap f msg =
 
 
 {-| Evaluate a `State model (Cmd msg)` given a model, and commands to prepend.
-
-Typically, `wrap` is used to make a function that creates a `State`. This function is then applied to
-(an optionally modified) outMsg. Run converts the State back to a (model, Cmd msg) tuple.
 
     wrap (interpretOutMsg) myOutMsg
         |> run Cmd.none myModel
