@@ -95,6 +95,9 @@ The complete new update function becomes:
 ```elm
 -- Gif.elm 
 
+-- explicitly expose all OutMsg constructors
+module Gif exposing (Model, view, update, Msg, OutMsg(..))
+
 type OutMsg 
     = SomethingWentWrong Http.Error 
 
@@ -138,7 +141,10 @@ A dummy interpretOutMsg could be
 ```elm 
 -- Parent.elm 
 
-interpretOutMsg : OutMsg -> Model -> (Model, Cmd Msg) 
+-- import all the child's OutMsg constructors
+import Gif exposing (Model, view, update, Msg, OutMsg(..))
+
+interpretOutMsg : Gif.OutMsg -> Model -> (Model, Cmd Msg) 
 interpretOutMsg outmsg model = 
     case outmsg of 
         SomethingWentWrong err -> 
