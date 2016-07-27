@@ -1,4 +1,4 @@
-module Gif exposing (Model, init, Msg, update, view, subscriptions)
+module Gif exposing (Model, init, Msg, update, view, subscriptions, OutMsg(..))
 
 import Html exposing (..)
 import Html.App as Html
@@ -13,7 +13,14 @@ main =
     Html.program
         { init = init "cats"
         , view = view
-        , update = update
+        , update =
+            (\msg model ->
+                let
+                    ( newModel, cmds, _ ) =
+                        update msg model
+                in
+                    ( newModel, cmds )
+            )
         , subscriptions = subscriptions
         }
 
@@ -45,17 +52,21 @@ type Msg
     | FetchFail Http.Error
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+type OutMsg
+    = SomethingWentWrong Http.Error
+
+
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe OutMsg )
 update msg model =
     case msg of
         MorePlease ->
-            ( model, getRandomGif model.topic )
+            ( model, getRandomGif model.topic, Nothing )
 
         FetchSucceed newUrl ->
-            ( Model model.topic newUrl, Cmd.none )
+            ( Model model.topic newUrl, Cmd.none, Nothing )
 
-        FetchFail _ ->
-            ( model, Cmd.none )
+        FetchFail e ->
+            ( model, Cmd.none, Just <| SomethingWentWrong e )
 
 
 

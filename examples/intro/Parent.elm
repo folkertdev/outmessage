@@ -3,7 +3,8 @@ module Parent exposing (..)
 import Html exposing (..)
 import Html.App as App
 import Html.Attributes exposing (..)
-import Gif
+import Gif exposing (OutMsg(..))
+import OutMessage
 
 
 main =
@@ -55,22 +56,34 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Left leftMsg ->
-            let
-                ( left, leftCmds ) =
-                    Gif.update leftMsg model.left
-            in
-                ( Model left model.right
-                , Cmd.map Left leftCmds
-                )
+            Gif.update leftMsg model.left
+                -- add the updated child to the parent
+                |>
+                    OutMessage.mapComponent (\newChild -> Model newChild model.right)
+                -- map the child's commands to parent commands
+                |>
+                    OutMessage.mapCmd Left
+                -- give a default command (for Nothing) and a way
+                -- to convert OutMsg to (Model, Cmd Msg)
+                |>
+                    OutMessage.evaluateMaybe interpretOutMsg Cmd.none
 
         Right rightMsg ->
+            Gif.update rightMsg model.right
+                |> OutMessage.mapComponent (\newChild -> Model model.left newChild)
+                |> OutMessage.mapCmd Right
+                |> OutMessage.evaluateMaybe interpretOutMsg Cmd.none
+
+
+interpretOutMsg : Gif.OutMsg -> Model -> ( Model, Cmd Msg )
+interpretOutMsg outmsg model =
+    case outmsg of
+        SomethingWentWrong err ->
             let
-                ( right, rightCmds ) =
-                    Gif.update rightMsg model.right
+                _ =
+                    Debug.log "A child component had an http error" (toString err)
             in
-                ( Model model.left right
-                , Cmd.map Right rightCmds
-                )
+                ( model, Cmd.none )
 
 
 
