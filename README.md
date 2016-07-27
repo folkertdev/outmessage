@@ -45,7 +45,9 @@ ChildComponentMessageWrapper childMsg ->
 #An example
 
 As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. 
-Let's say that the parent component needs to be notified of any http failures, so it can respond to them. 
+Let's say that the parent component needs to be notified of any http failures, so it can respond to them. The changes that 
+are described here can be found in 
+[this commit](https://github.com/folkertdev/outmessage/commit/0ab20bd4e0f28d74e4c00f0248ed2300aff20aed), the full code in the [examples/intro](https://github.com/folkertdev/outmessage/tree/master/examples/intro) folder.
 
 Following the pattern, we need to: 
 
@@ -96,22 +98,23 @@ The complete new update function becomes:
 -- Gif.elm 
 
 -- explicitly expose all OutMsg constructors
-module Gif exposing (Model, view, update, Msg, OutMsg(..))
+module Gif exposing (Model, init, Msg, update, view, subscriptions, OutMsg(..))
 
-type OutMsg 
-    = SomethingWentWrong Http.Error 
+type OutMsg
+    = SomethingWentWrong Http.Error
 
-update : Msg -> Model -> (Model, Cmd Msg, Maybe OutMsg)
+
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe OutMsg )
 update msg model =
-  case msg of
-    MorePlease ->
-      (model, getRandomGif model.topic, Nothing)
+    case msg of
+        MorePlease ->
+            ( model, getRandomGif model.topic, Nothing )
 
-    FetchSucceed newUrl ->
-      (Model model.topic newUrl, Cmd.none, Nothing)
+        FetchSucceed newUrl ->
+            ( Model model.topic newUrl, Cmd.none, Nothing )
 
-    FetchFail err ->
-      (model, Cmd.none, SomethingWentWrong err)
+        FetchFail e ->
+            ( model, Cmd.none, Just <| SomethingWentWrong e )
 ```
 
 ###Changes to the parent
@@ -142,13 +145,17 @@ A dummy interpretOutMsg could be
 -- Parent.elm 
 
 -- import all the child's OutMsg constructors
-import Gif exposing (Model, view, update, Msg, OutMsg(..))
+import Gif exposing (OutMsg(..))
 
-interpretOutMsg : Gif.OutMsg -> Model -> (Model, Cmd Msg) 
-interpretOutMsg outmsg model = 
-    case outmsg of 
-        SomethingWentWrong err -> 
-            Debug.log "A child component had an http error" (toString err) 
+interpretOutMsg : Gif.OutMsg -> Model -> ( Model, Cmd Msg )
+interpretOutMsg outmsg model =
+    case outmsg of
+        SomethingWentWrong err ->
+            let
+                _ =
+                    Debug.log "A child component had an http error" (toString err)
+            in
+                ( model, Cmd.none )
 ```
 
 
@@ -193,15 +200,13 @@ Not very pretty. This kind of code is extremely error-prone, because the updatin
 
 ```elm
     Right rightMsg ->
-    -- call update of the child component
-        Gif.update rightMsg model.right
-            -- add the updated child component to the model
-            |> OutMessage.mapComponent
-                    (\newChild -> Model model.left newChild)
-            -- map the child's commands
-            |> OutMessage.mapCmd Right 
-            -- OutMessage takes care of the rest
-            |> OutMessage.evaluateMaybe Cmd.none interpretOutMsg
+            Gif.update rightMsg model.right
+                -- add the updated child component to the model
+                |> OutMessage.mapComponent (\newChild -> Model model.left newChild)
+                -- map the child's commands to parent commands
+                |> OutMessage.mapCmd Right
+                -- Give OutMsg to effects function and a default command (for Nothing)
+                |> OutMessage.evaluateMaybe interpretOutMsg Cmd.none
 ```
 
 At the end of this, you are left with normal `(Model, Cmd Msg)` tuple. 
