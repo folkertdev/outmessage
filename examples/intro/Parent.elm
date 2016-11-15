@@ -1,14 +1,13 @@
 module Parent exposing (..)
 
 import Html exposing (..)
-import Html.App as App
 import Html.Attributes exposing (..)
 import Gif exposing (OutMsg(..))
 import OutMessage
 
 
 main =
-    App.program
+    Html.program
         { init = init "funny cats" "funny dogs"
         , view = view
         , update = update
@@ -95,8 +94,8 @@ view model =
     div
         [ style [ ( "display", "flex" ) ]
         ]
-        [ App.map Left (Gif.view model.left)
-        , App.map Right (Gif.view model.right)
+        [ Html.map Left (Gif.view model.left)
+        , Html.map Right (Gif.view model.right)
         ]
 
 

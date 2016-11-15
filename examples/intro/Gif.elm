@@ -1,7 +1,6 @@
 module Gif exposing (Model, init, Msg, update, view, subscriptions, OutMsg(..))
 
 import Html exposing (..)
-import Html.App as Html
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
@@ -48,8 +47,7 @@ init topic =
 
 type Msg
     = MorePlease
-    | FetchSucceed String
-    | FetchFail Http.Error
+    | Fetch (Result Http.Error String)
 
 
 type OutMsg
@@ -62,10 +60,10 @@ update msg model =
         MorePlease ->
             ( model, getRandomGif model.topic, Nothing )
 
-        FetchSucceed newUrl ->
+        Fetch (Ok newUrl) ->
             ( Model model.topic newUrl, Cmd.none, Nothing )
 
-        FetchFail e ->
+        Fetch (Err e) ->
             ( model, Cmd.none, Just <| SomethingWentWrong e )
 
 
@@ -114,7 +112,7 @@ getRandomGif topic =
         url =
             "//api.giphy.com/v1/gifs/random?api_key=dc6zaTOxFJmzC&tag=" ++ topic
     in
-        Task.perform FetchFail FetchSucceed (Http.get decodeGifUrl url)
+        Http.send Fetch (Http.get url decodeGifUrl)
 
 
 decodeGifUrl : Json.Decoder String
