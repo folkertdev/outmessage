@@ -11,7 +11,7 @@ The pattern can be extended to work with multiple `OutMsg` using `List` or to op
 
 **Technical writing is hard:** If anything is unclear, please open an issue, or create a PR.
 
-##The core idea
+## The core idea
 
 Using OutMsg means that the update function of a child component returns a value of type OutMsg. Instead of the 
 usual type:
@@ -42,7 +42,7 @@ ChildComponentMessageWrapper childMsg ->
         |> OutMessage.evaluate interpretOutMsg
 ```
 
-#An example
+# An example
 
 As a running example, let's look at [TEA](https://github.com/evancz/elm-architecture-tutorial/tree/master/nesting)s Gif. 
 Let's say that the parent component needs to be notified of any http failures, so it can respond to them. The changes that 
@@ -56,7 +56,7 @@ Following the pattern, we need to:
 * Wire everything up in the parent's update function
 
 
-###Changes to the child
+### Changes to the child
 
 The child's update function is defined as follows:
 ```elm
@@ -117,7 +117,7 @@ update msg model =
             ( model, Cmd.none, Just <| SomethingWentWrong e )
 ```
 
-###Changes to the parent
+### Changes to the parent
 
 The `OutMsg` value can now be extracted by the parent
 
@@ -159,7 +159,7 @@ interpretOutMsg outmsg model =
 ```
 
 
-###Wiring
+### Wiring
 
 The only thing that remains is wiring, but that seems to become a hairy affair very quickly. That is where this 
 library comes in.
@@ -211,7 +211,7 @@ Not very pretty. This kind of code is extremely error-prone, because the updatin
 
 At the end of this, you are left with normal `(Model, Cmd Msg)` tuple. 
 
-#<a name="why-not-use-msg">Why not use Msg</a>
+# <a name="why-not-use-msg">Why not use Msg</a>
 
 A naive way to achieve parent-child communication is to (ab)use the child's Msg type. In the parent's update function, 
 the child Msg type can be pattern matched on. When a Msg is of a certain value, the parent can take action. In the Gif example, that
@@ -259,7 +259,7 @@ this action will extend the child's update function with an extra pattern match 
 
 
 
-#Thanks 
+# Thanks 
 
 This idea is not mine, and has been shaped by chats with numerous people on the elm slack channel. 
 
