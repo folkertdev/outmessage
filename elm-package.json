@@ -1,5 +1,5 @@
 {
-    "version": "1.1.0",
+    "version": "1.1.1",
     "summary": "Streamlining child-parent communication using The Elm Architecture with OutMsg",
     "repository": "https://github.com/folkertdev/outmessage.git",
     "license": "BSD3",
