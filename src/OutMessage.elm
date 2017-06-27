@@ -7,6 +7,7 @@ module OutMessage
         , mapComponent
         , mapCmd
         , mapOutMsg
+        , addOutMsg
         , toNested
         , fromNested
         , run
@@ -33,7 +34,7 @@ The basic pattern can be extended to return multiple OutMsg using List or to opt
 @docs mapComponent, mapCmd, mapOutMsg
 
 #Helpers
-@docs toNested, fromNested
+@docs addOutMsg, toNested, fromNested
 
 #Internals
 
@@ -178,6 +179,16 @@ mapOutMsg f ( x, y, outMsg ) =
 
 
 -- Handy functions
+
+
+{-| Add an outmessage to the normal type that `update` has.  Handy to use in a pipe:
+
+  { model | a = 1 } ! []
+    |> addOutMsg Nothing
+-}
+addOutMsg : outMsg -> (model, Cmd msg) -> (model, Cmd msg, outMsg)
+addOutMsg outMsg (model, cmd) =
+  (model, cmd, outMsg)
 
 
 {-| Helper to split the OutMsg from the normal type that `update` has.
