@@ -183,12 +183,12 @@ mapOutMsg f ( x, y, outMsg ) =
 
 {-| Add an outmessage to the normal type that `update` has.  Handy to use in a pipe:
 
-  { model | a = 1 } ! []
+  ( { model | a = 1 }, Cmd.none )
     |> addOutMsg Nothing
 -}
-addOutMsg : outMsg -> (model, Cmd msg) -> (model, Cmd msg, outMsg)
-addOutMsg outMsg (model, cmd) =
-  (model, cmd, outMsg)
+addOutMsg : outMsg -> ( model, Cmd msg ) -> ( model, Cmd msg, outMsg )
+addOutMsg outMsg ( model, cmd ) =
+    ( model, cmd, outMsg )
 
 
 {-| Helper to split the OutMsg from the normal type that `update` has.
